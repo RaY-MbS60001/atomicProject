@@ -1,7 +1,52 @@
-# Email list generated from: cleaned_emails_20251008_203047.txt
-# Total emails: 1171
+# email_sender.py
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+import os
+import time
+import random
+import logging
+import re
+from tqdm import tqdm
 
-email_list = [
+# logging absolute path
+script_dir = os.path.dirname(os.path.abspath(__file__))
+log_file = os.path.join(script_dir, 'email_sender.log')
+
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Email Configuration
+SMTP_SERVER = 'smtp.gmail.com'
+SMTP_PORT = 587
+SENDER_EMAIL = "sfisomabaso12242001@gmail.com"
+SENDER_PASSWORD = "swwf uqok tqeo ####"  # App Password
+
+# Email Content
+SUBJECT = "Learnership/Internship Application"
+BODY = """
+Good day. My name is Sbongakonke Sfiso Mabaso, and I am currently seeking a learning opportunity in the form of a learnership or internship to further grow my skills and contribute meaningfully within a dynamic and forward-thinking technology team.
+
+I am passionate about the IT field and eager to apply the knowledge I have gained through my academic journey in a practical environment, while continuously learning and adding value.
+
+Please find my CV attached for your consideration. I would be truly grateful for an opportunity to be part of your organization and contribute wherever possible.
+
+Kind regards,
+Sbongakonke Sfiso Mabaso
+📞 076 017 8522
+📧 sfisomabaso12242001@gmail.com
+"""
+
+# File path for CV 
+ATTACHMENT_FILE = os.path.join(script_dir, "ilovepdf_merged (1).pdf")
+
+# Your email list
+emails = [
     "1-cv@infopersonnel.co.za",
     "10-recruitment@reagetswemininggroup.co.za",
     "11-rudith@newrak.co.za",
@@ -1174,3 +1219,143 @@ email_list = [
     "zukiswa.nogqala@bell-mark.co.za",
     "zuzeka.williams@trainingforce.co.za"
 ]
+
+
+
+def is_valid_email(email):
+    """Validate email format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def create_email_message(to_email):
+    """Create the email message with attachment."""
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = to_email
+    msg['Subject'] = SUBJECT
+    
+    msg.attach(MIMEText(BODY, 'plain'))
+    
+    # Attach CV
+    if os.path.exists(ATTACHMENT_FILE):
+        with open(ATTACHMENT_FILE, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename={os.path.basename(ATTACHMENT_FILE)}'
+            )
+            msg.attach(part)
+    
+    return msg
+
+def send_email(to_email):
+    """Send email to a single recipient."""
+    try:
+        if not is_valid_email(to_email):
+            raise ValueError("Invalid email format")
+
+        msg = create_email_message(to_email)
+        
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+            
+        logging.info(f"Successfully sent email to {to_email}")
+        return True, "Email sent successfully"
+        
+    except FileNotFoundError:
+        error_msg = f"CV file not found: {ATTACHMENT_FILE}"
+        logging.error(error_msg)
+        return False, error_msg
+    except smtplib.SMTPAuthenticationError:
+        error_msg = "SMTP Authentication failed"
+        logging.error(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Error sending to {to_email}: {str(e)}"
+        logging.error(error_msg)
+        return False, error_msg
+
+def setup_check():
+    """Perform initial setup checks."""
+    print("\n============== S y s t e m - C h e c k ==============")
+    
+    # Check CV file
+    if not os.path.exists(ATTACHMENT_FILE):
+        print(f"❌ CV file not found at: {ATTACHMENT_FILE}")
+        return False
+    print(f"✓ CV file found: {os.path.basename(ATTACHMENT_FILE)}")
+    
+    # Test email connection
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            print("✓ Email authentication successful")
+            return True
+    except Exception as e:
+        print(f"❌ Email connection failed: {str(e)}")
+        return False
+
+def main():
+    """Main function to handle email sending process."""
+    print("Starting email sending process...")
+    
+    # Perform setup checks
+    if not setup_check():
+        print("\nSetup check failed. Please fix the errors and try again.")
+        return
+    
+    # Validate emails
+    valid_emails = [email for email in emails if is_valid_email(email)]
+    logging.info(f"Found {len(valid_emails)} valid emails out of {len(emails)} total")
+    
+    if not valid_emails:
+        print("No valid emails found to process!")
+        return
+    
+    print(f"\nFound {len(valid_emails)} valid emails to process")
+    confirm = input("Continue with sending emails? (y/n): ").lower()
+    if confirm != 'y':
+        print("Operation cancelled by user")
+        return
+    
+    successful_sends = 0
+    failed_sends = 0
+    
+    # Process emails with progress bar
+    for email in tqdm(valid_emails, desc="Sending emails", unit="email"):
+        success, message = send_email(email)
+        
+        if success:
+            successful_sends += 1
+        else:
+            failed_sends += 1
+            print(f"\nFailed to send to {email}: {message}")
+            
+        # Random delay 30-60 second
+        time.sleep(random.uniform(30, 60))
+    
+    # Print summary
+    print("\n=============== Email Sending Summary ===============")
+    print(f"Total emails processed: {len(valid_emails)}")
+    print(f"Successful sends: {successful_sends}")
+    print(f"Failed sends: {failed_sends}")
+    
+    logging.info(f"Email sending completed. Success: {successful_sends}, Failed: {failed_sends}")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user")
+        logging.warning("Process interrupted by user")
+    except Exception as e:
+        print(f"\nAn unexpected error occurred: {str(e)}")
+        logging.error(f"Unexpected error: {str(e)}")
+    
+    print("\nPress Enter to exit...")
+    input()

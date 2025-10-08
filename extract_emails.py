@@ -62,7 +62,7 @@ def extract_emails_fast(input_file):
 # Main execution
 if __name__ == "__main__":
     # Replace with your txt file name
-    INPUT_FILE = 'extract1 (6).txt'
+    INPUT_FILE = 'newToMergeEmailList.txt'
     
     # Check if file exists
     if not os.path.exists(INPUT_FILE):

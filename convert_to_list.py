@@ -67,7 +67,7 @@ def txt_to_python_list(input_file, output_file='email_list.py'):
 
 # Main execution
 if __name__ == "__main__":
-    INPUT_FILE = 'cleaned_emails_20251008_132244.txt'  
+    INPUT_FILE = 'cleaned_emails_20251008_203047.txt'  
     OUTPUT_FILE = 'ready_email_list.py'  
     
     print("=" * 70)
