@@ -1,0 +1,28 @@
+{
+  "smtp": {
+    "server": "smtp.gmail.com",
+    "port": 587,
+    "sender_email": "sfisomabaso12242001@gmail.com",
+    "sender_password": "your_app_password_here"
+  },
+  "email": {
+    "subject": "Learnership/Internship Application",
+    "body_template": "email_template.txt",
+    "attachment": "ilovepdf_merged (1).pdf"
+  },
+  "settings": {
+    "delay_min": 30,
+    "delay_max": 60,
+    "rate_limit_per_minute": 30,
+    "rate_limit_per_hour": 500,
+    "connection_pool_size": 3,
+    "connection_timeout": 30,
+    "max_retries": 3
+  },
+  "paths": {
+    "log_file": "email_sender.log",
+    "report_file": "email_report.json",
+    "email_list_txt": "email_list.txt",
+    "email_list_csv": "email_list.csv"
+  }
+}

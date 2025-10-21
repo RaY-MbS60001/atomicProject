@@ -1,4 +1,3 @@
-# email_sender.py
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -9,9 +8,10 @@ import time
 import random
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-# logging absolute path
+# logging setup
 script_dir = os.path.dirname(os.path.abspath(__file__))
 log_file = os.path.join(script_dir, 'email_sender.log')
 
@@ -24,28 +24,30 @@ logging.basicConfig(
 # Email Configuration
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
-SENDER_EMAIL = "Palesa11307@gmail.com"
-SENDER_PASSWORD = "bybs gdmu detz pyke"  # App Password
+SENDER_EMAIL = "apollonhlakaniphomvula@gmail.com"
+SENDER_PASSWORD = "ywsr ydyv krxf oqvi"
 
 # Email Content
-SUBJECT = "Learnership/Internship Application"
+SUBJECT = "Application for Learnership Opportunity – Apollo Nhlakanipho Mvula"
 BODY = """
-Dear Hiring Manager,
+Dear Hiring Team,
 
-I hope this message finds you well. My name is Palesa Nomonde Moloi, and I am currently seeking a learning opportunity in the form of a learnership or internship where I can further develop my skills and gain practical experience within a dynamic and forward-thinking team.
+I hope this message finds you well.
 
-I am passionate about personal and professional growth and eager to apply the knowledge I have gained through my academic journey in a real-world environment. I am committed to continuous learning and contributing meaningfully wherever I can.
+I am writing to express my sincere interest in any learnership opportunities within your organization. I am eager to develop my skills, gain practical experience, and grow professionally in a dynamic and supportive environment like yours.
 
-Please find my CV attached for your consideration. I would sincerely appreciate the opportunity to be part of your organization and contribute to its goals in any way possible.
+Please find my CV attached, which provides more detail about my background and aspirations. I am enthusiastic about the opportunity to contribute to your team while continuing to learn and improve.
+
+Thank you for considering my application. I look forward to the opportunity to engage further.
 
 Kind regards,
-Palesa Nomonde Moloi
-📞 064 600 5805
-📧 Palesa11307@gmail.com
+Apollo Nhlakanipho Mvula
+📞 +27 67 384 7617 (WhatsApp available)
+📧 apollonhlakaniphomvula@gmail.com
 """
 
-# File path for CV 
-ATTACHMENT_FILE = os.path.join(script_dir, "Moloi Palesa's CV_merged.pdf")
+# File path for CV - ensure this file exists at this path
+ATTACHMENT_FILE = os.path.join(script_dir, "Apollo Nhlakanipho Mvula (1)_merged.pdf")
 
 # Your email list
 emails = [
@@ -1223,22 +1225,45 @@ emails = [
 ]
 
 
+# Path to bounce message text files (can be multiple)
+# For demonstration, use a single file; extend to multiple if needed
+BOUNCE_TEXT_FILE = os.path.join(script_dir, "bounce_messages.txt")
+
+def extract_bounced_emails_from_text(text):
+    """Extract unique email addresses from bounce message text."""
+    pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    found_emails = re.findall(pattern, text)
+    # Exclude sender email and duplicates:
+    filtered = [e.lower() for e in found_emails if e.lower() != SENDER_EMAIL.lower()]
+    unique = list(set(filtered))
+    return unique
+
+def load_bounced_emails(filepath):
+    """Load bounce message text from file and extract bounced emails."""
+    if not os.path.exists(filepath):
+        logging.warning(f"Bounce message file not found: {filepath}")
+        return []
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            text = f.read()
+        bounced = extract_bounced_emails_from_text(text)
+        logging.info(f"Extracted {len(bounced)} bounced emails from bounce file.")
+        return bounced
+    except Exception as e:
+        logging.error(f"Failed to load/parse bounce file: {e}")
+        return []
 
 def is_valid_email(email):
-    """Validate email format."""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
 
 def create_email_message(to_email):
-    """Create the email message with attachment."""
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = to_email
     msg['Subject'] = SUBJECT
-    
     msg.attach(MIMEText(BODY, 'plain'))
-    
-    # Attach CV
+
     if os.path.exists(ATTACHMENT_FILE):
         with open(ATTACHMENT_FILE, "rb") as attachment:
             part = MIMEBase('application', 'octet-stream')
@@ -1246,52 +1271,40 @@ def create_email_message(to_email):
             encoders.encode_base64(part)
             part.add_header(
                 'Content-Disposition',
-                f'attachment; filename={os.path.basename(ATTACHMENT_FILE)}'
+                f'attachment; filename="{os.path.basename(ATTACHMENT_FILE)}"'
             )
             msg.attach(part)
-    
+    else:
+        logging.error(f"Attachment file not found: {ATTACHMENT_FILE}")
     return msg
 
-def send_email(to_email):
-    """Send email to a single recipient."""
-    try:
-        if not is_valid_email(to_email):
-            raise ValueError("Invalid email format")
+def worker_send_email(email):
+    """Sends email making its own SMTP connection."""
+    time.sleep(random.uniform(0.5, 2.0))  # small random delay to stagger requests
+    if not is_valid_email(email):
+        return (email, False, "Invalid email format")
 
-        msg = create_email_message(to_email)
-        
+    msg = create_email_message(email)
+    try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
-            
-        logging.info(f"Successfully sent email to {to_email}")
-        return True, "Email sent successfully"
-        
-    except FileNotFoundError:
-        error_msg = f"CV file not found: {ATTACHMENT_FILE}"
-        logging.error(error_msg)
-        return False, error_msg
-    except smtplib.SMTPAuthenticationError:
-        error_msg = "SMTP Authentication failed"
-        logging.error(error_msg)
-        return False, error_msg
+        logging.info(f"Email successfully sent to {email}")
+        return (email, True, "Sent successfully")
     except Exception as e:
-        error_msg = f"Error sending to {to_email}: {str(e)}"
-        logging.error(error_msg)
-        return False, error_msg
+        logging.error(f"Failed to send email to {email}: {e}")
+        return (email, False, str(e))
 
 def setup_check():
-    """Perform initial setup checks."""
-    print("\n======================== S y s t e m - C h e c k ========================")
-    
-    # Check CV file
+    print("\n=================================== S Y S T E M - C H E C K ===================================")
+
     if not os.path.exists(ATTACHMENT_FILE):
         print(f"❌ CV file not found at: {ATTACHMENT_FILE}")
+        logging.error(f"CV file not found: {ATTACHMENT_FILE}")
         return False
     print(f"✓ CV file found: {os.path.basename(ATTACHMENT_FILE)}")
-    
-    # Test email connection
+
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
@@ -1299,65 +1312,72 @@ def setup_check():
             print("✓ Email authentication successful")
             return True
     except Exception as e:
-        print(f"❌ Email connection failed: {str(e)}")
+        print(f"❌ Email connection failed: {e}")
+        logging.error(f"Email connection failed: {e}")
         return False
 
+def filter_bounced(original, bounced):
+    bounced_set = set(email.lower().strip() for email in bounced)
+    filtered = [email for email in original if email.lower().strip() not in bounced_set]
+    return filtered
+
 def main():
-    """Main function to handle email sending process."""
     print("Starting email sending process...")
-    
-    # Perform setup checks
+
     if not setup_check():
-        print("\nSetup check failed. Please fix the errors and try again.")
+        print("Setup check failed. Please fix errors and retry.")
         return
-    
-    # Validate emails
-    valid_emails = [email for email in emails if is_valid_email(email)]
-    logging.info(f"Found {len(valid_emails)} valid emails out of {len(emails)} total")
-    
+
+    bounced_emails = load_bounced_emails(BOUNCE_TEXT_FILE)
+
+    normalized_emails = [e.lower().strip() for e in emails]
+    unique_emails = list(set(normalized_emails))
+    filtered_emails = [e for e in unique_emails if not e.endswith('@gmail.com')]
+    clean_emails = filter_bounced(filtered_emails, bounced_emails)
+    valid_emails = [e for e in clean_emails if is_valid_email(e)]
+
+    logging.info(f"Prepared {len(valid_emails)} valid emails after filtering bounced emails.")
+
     if not valid_emails:
-        print("No valid emails found to process!")
+        print("No valid emails found to send after filtering.")
         return
-    
-    print(f"\nFound {len(valid_emails)} valid emails to process")
-    confirm = input("Continue with sending emails? (y/n): ").lower()
-    if confirm != 'y':
-        print("Operation cancelled by user")
+
+    print(f"Sending {len(valid_emails)} valid emails.")
+    proceed = input("Continue? (y/n): ").lower()
+    if proceed != 'y':
+        print("Operation cancelled.")
         return
-    
-    successful_sends = 0
-    failed_sends = 0
-    
-    # Process emails with progress bar
-    for email in tqdm(valid_emails, desc="Sending emails", unit="email"):
-        success, message = send_email(email)
-        
-        if success:
-            successful_sends += 1
-        else:
-            failed_sends += 1
-            print(f"\nFailed to send to {email}: {message}")
-            
-        # Random delay 30-60 second
-        time.sleep(random.uniform(30, 60))
-    
-    # Print summary
-    print("\n=============== Email Sending Summary ===============")
+
+    successful = 0
+    failed = 0
+    max_workers = 5
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(worker_send_email, em): em for em in valid_emails}
+        for f in tqdm(as_completed(futures), total=len(valid_emails), desc="Sending emails"):
+            email, success, message = f.result()
+            if success:
+                successful += 1
+            else:
+                failed += 1
+                print(f"\nFailed to send to {email}: {message}")
+
+    print("\n=================================== S U M M A R Y ===================================")
     print(f"Total emails processed: {len(valid_emails)}")
-    print(f"Successful sends: {successful_sends}")
-    print(f"Failed sends: {failed_sends}")
-    
-    logging.info(f"Email sending completed. Success: {successful_sends}, Failed: {failed_sends}")
+    print(f"Successful emails: {successful}")
+    print(f"Failed emails: {failed}")
+
+    logging.info(f"Email sending completed. Success: {successful}, Failed: {failed}")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nProcess interrupted by user")
-        logging.warning("Process interrupted by user")
+        print("\nUser interrupted the program.")
+        logging.warning("Program interrupted by user.")
     except Exception as e:
-        print(f"\nAn unexpected error occurred: {str(e)}")
-        logging.error(f"Unexpected error: {str(e)}")
-    
-    print("\nPress Enter to exit...")
+        print(f"\nUnexpected error: {e}")
+        logging.error(f"Unexpected error: {e}")
+
+    print("\nPress Enter to exit.")
     input()

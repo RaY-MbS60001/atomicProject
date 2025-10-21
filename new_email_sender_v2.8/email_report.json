@@ -1,0 +1,22 @@
+{
+  "last_updated": "2024-01-15T10:30:00",
+  "successful": {
+    "email@example.com": {
+      "timestamp": "2024-01-15T10:25:00",
+      "attempts": 1
+    }
+  },
+  "failed": {
+    "bad@example.com": {
+      "first_attempt": "2024-01-15T10:20:00",
+      "last_attempt": "2024-01-15T10:28:00",
+      "attempts": 2,
+      "errors": [...]
+    }
+  },
+  "statistics": {
+    "total_successful": 150,
+    "total_failed": 10,
+    "total_attempts": 160
+  }
+}

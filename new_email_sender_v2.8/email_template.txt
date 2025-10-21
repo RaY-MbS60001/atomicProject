@@ -1,0 +1,10 @@
+Good day. My name is {name}, and I am currently seeking a learning opportunity in the form of a learnership or internship to further grow my skills and contribute meaningfully within a dynamic and forward-thinking technology team.
+
+I am passionate about the IT field and eager to apply the knowledge I have gained through my academic journey in a practical environment, while continuously learning and adding value.
+
+Please find my CV attached for your consideration. I would be truly grateful for an opportunity to be part of your organization and contribute wherever possible.
+
+Kind regards,
+{name}
+📞 {phone}
+📧 {email}
